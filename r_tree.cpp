@@ -24,8 +24,8 @@ struct Node{
     }
 };
 
-void BulkLoad(string fileName,int N, int d, int maxCap);
-void AssignParent(string fileName, int start, int end, int d, int maxCap);
+int BulkLoad(string fileName,int N, int d, int maxCap);
+int AssignParent(string fileName, int start, int end, int d, int maxCap);
 
 void ReadNode(char *dataIn, Node *node);
 
@@ -38,9 +38,17 @@ void TestFunction(string fileName, int d, int maxCap){
 
         Node *newNode = new Node(d,maxCap);
         memcpy(newNode, data, sizeof(Node));
-        cout << newNode->ID  << " " << newNode->parentID << endl;
-        for (int j = 0; j < maxCap; j++){
-            cout << *(int *)(data+j*INT_SIZE) << " ";
+        //cout << newNode->ID  << " " << newNode->parentID << endl;
+        
+        // for(int k=0; k<maxCap; k++){
+        //     for(int j=0 ;j< 2*d; j++){
+        //         cout << *(int *)(newNode->childData+(2*d*k+j)*INT_SIZE) << " ";
+        //     }
+        //     cout << endl;
+        // }
+        
+        for (int j = 0; j < 2*d; j++){
+            cout << *(int *)(newNode->mbr+(j)*INT_SIZE) << " ";
         }
         cout << endl;
         fh.UnpinPage(i);
@@ -66,7 +74,8 @@ int main(int argc, char* argv[]){
             string fileName;
             inFile >> fileName;
             inFile >> N; 
-            //BulkLoad(fileName, N, d, maxCap);
+            int rootIndex = BulkLoad(fileName, N, d, maxCap);
+            cout << "root= " << rootIndex << endl; 
             TestFunction(fileName, d, maxCap);
             outFile << cmd;
         } else if (cmd=="INSERT"){
@@ -88,11 +97,12 @@ int main(int argc, char* argv[]){
     }
     inFile.close();
     outFile.close();
+    fm.DestroyFile("treeData.txt");
 
 
 }
 
-void BulkLoad(string fileName, int N, int d, int maxCap){
+int BulkLoad(string fileName, int N, int d, int maxCap){
     FileHandler fhIn, fhOut;
     PageHandler phIn, phOut;
     char *dataIn, *dataOut;
@@ -146,23 +156,33 @@ void BulkLoad(string fileName, int N, int d, int maxCap){
     fm.CloseFile(fhOut);
     fm.CloseFile(fhIn);  
 
-    AssignParent(fileName, 0, N, d, maxCap);  
+    return AssignParent(fileName, 0, N, d, maxCap);  
 }
 
-void AssignParent(string fileName, int start, int end, int d, int maxCap){
-    cout << "AssignParent "<< start << " " << end << endl;
+// TODO := handle Non Perfect divisible Cases 
+int AssignParent(string fileName, int start, int end, int d, int maxCap){
     FileHandler fhIn, fhOut;
     PageHandler phIn, phOut;
     char *dataIn, *dataOut;
     fhIn = fm.OpenFile("treeData.txt");
     fhOut = fm.OpenFile("treeData.txt");
     if (end-start==1)
-        return;
+        return start;
     int childNodes = end-start;
     int numParents = childNodes/maxCap+((childNodes%maxCap)!=0);
+    int o;
+    start==0? o=d: o=0; 
     for(int i=0 ;i<numParents; i++){
         Node *parentNode = new Node(d,maxCap);
         parentNode->ID = end+i;
+        
+        int minPoint[d];
+        int maxPoint[d];
+        for(int j=0; j<d ;j++){
+            minPoint[j]=INT_MAX;
+            maxPoint[j]=INT_MIN;
+        }
+        
         //store Child Data into Parent Node
         for(int j=0; j<maxCap; j++){
             int childID = start+i*maxCap+j;
@@ -177,11 +197,19 @@ void AssignParent(string fileName, int start, int end, int d, int maxCap){
             fhIn.MarkDirty(childID);
             fhIn.UnpinPage(childID);
 
+            for(int k=0; k<d ;k++){
+                minPoint[k]=min(minPoint[k],*(int *)(childNode->mbr+(k+o)*INT_SIZE));
+                maxPoint[k]=max(maxPoint[k],*(int *)(childNode->mbr+(k+d)*INT_SIZE));
+            }
+            
             //Copy Child Data
-            *(int *)(parentNode->childID+j)=childNode->ID;
+            *(int *)(parentNode->childID+j*INT_SIZE)=childNode->ID;
             memcpy(parentNode->childData+2*d*j*INT_SIZE,childNode->mbr,2*d*INT_SIZE); 
             
         }
+        //Store the Parent's mbr
+        memcpy(parentNode->mbr,minPoint,d*INT_SIZE);
+        memcpy(parentNode->mbr+d*INT_SIZE,maxPoint,d*INT_SIZE);
 
         //Store the Parent's Data
         phOut = fhOut.NewPage();
@@ -193,7 +221,7 @@ void AssignParent(string fileName, int start, int end, int d, int maxCap){
  
     } 
     fhOut.FlushPages();
-    AssignParent(fileName, end, end+numParents, d, maxCap);
+    return AssignParent(fileName, end, end+numParents, d, maxCap);
 
 }
 
