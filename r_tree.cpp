@@ -13,34 +13,34 @@ string tempFile = "treeData.txt";
 
 struct Node{
     int ID;   // 1 int
-    char *mbr; // 2*d int
+    int *mbr; // 2*d int
     int parentID; // 1 int
-    char *childID; // maxCap int                
-    char *childData; // 2*d*maxCap int
+    int *childID; // maxCap int                
+    int *childData; // 2*d*maxCap int
     
     Node(int d, int maxCap){
-        mbr = (char*)malloc(2*d*INT_SIZE);
-        childID = (char*)malloc(maxCap*INT_SIZE);
-        childData = (char*)malloc(2*d*maxCap*INT_SIZE);
+        mbr = (int*)malloc(2*d*INT_SIZE);
+        childID = (int*)malloc(maxCap*INT_SIZE);
+        childData = (int*)malloc(2*d*maxCap*INT_SIZE);
     }
     int getChildID(int i);
-    char *getChildData(int i, int d);
+    int *getChildData(int i, int d);
     bool isLeaf(int maxCap);
 };
 
 int Node::getChildID(int i){
-    return *(int *)(childID+i*INT_SIZE);
+    return *(childID+i);
 }
 
-char* Node::getChildData(int i, int d){
-    return childData+i*2*d*INT_SIZE;
+int* Node::getChildData(int i, int d){
+    return childData+i*2*d;
 }
 
-bool isInside(char *point, char *mbr, int d){
+bool isInside(int *point, int *mbr, int d){
     for(int i=0; i<d; i++){
-        int minD = *(int *)(mbr+i*INT_SIZE);
-        int maxD = *(int *)(mbr+(i+d)*INT_SIZE);
-        int pointD = *(int *)(point+i*INT_SIZE);
+        int minD = *(mbr+i);
+        int maxD = *(mbr+(i+d));
+        int pointD = *(point+i);
         //cout << minD << " " << pointD 
         if ((pointD < minD) | (pointD > maxD)){
             return false;
@@ -49,9 +49,9 @@ bool isInside(char *point, char *mbr, int d){
     return true;
 }
 
-bool isEqual(char *point1, char *point2, int d){
+bool isEqual(int *point1, int *point2, int d){
     for(int i=0; i<d; i++){
-        if (*(int *)(point1+i*INT_SIZE)!= *(int *)(point2+i*INT_SIZE))
+        if (*(point1+i)!= *(point2+i))
             return false;
     }
     return true;
@@ -68,8 +68,8 @@ bool Node::isLeaf(int maxCap){
 }
 
 int BulkLoad(char* fileName,int N, int d, int maxCap);
-int AssignParent(string fileName, int start, int end, int d, int maxCap);
-bool isPresent(char *point, int nodeID, int d, int maxCap);
+int AssignParent(int start, int end, int d, int maxCap);
+bool isPresent(int *point, int nodeID, int d, int maxCap);
 void TestFunction(string fileName, int d, int maxCap, int N){
     FileHandler fh = fm.OpenFile("treeData.txt");
     PageHandler ph;
@@ -119,14 +119,14 @@ int main(int argc, char* argv[]){
             
             char *fileName = (char*)malloc(fName.size());
             memcpy(fileName, &fName,fName.size());
-            
+        
             rootIndex = BulkLoad(fileName, N, d, maxCap);
             cout << "root= " << rootIndex << endl; 
             int array[2];
             array[0]=585167411;
             array[1]=2791691; 
             
-            cout << isPresent((char *)array, rootIndex, d, maxCap);
+            cout << isPresent(array, rootIndex, d, maxCap);
             //TestFunction(fileName, d, maxCap, N);
             outFile << cmd;
         } else if (cmd=="INSERT"){
@@ -134,7 +134,7 @@ int main(int argc, char* argv[]){
             for (int i=0; i<d ;i++){
                 inFile>>PointArray[i];
             }
-            bool result = isPresent((char *)PointArray,rootIndex, d, maxCap);
+            bool result = isPresent(PointArray,rootIndex, d, maxCap);
             outFile << cmd;
         } else if (cmd=="QUERY"){
             int PointArray[d];
@@ -159,7 +159,6 @@ int BulkLoad(char* fileName, int N, int d, int maxCap){
     PageHandler phIn, phOut;
     char *dataIn, *dataOut;
     fhIn = fm.OpenFile("Testcases/TC_1/sortedData_2_10_100.txt");
-    //fhOut = fm.CreateFile((char *)&tempFile);
     fhOut = fm.CreateFile("treeData.txt");
     int pointSize = INT_SIZE*d;
     int pointPerPage = PAGE_CONTENT_SIZE/pointSize;
@@ -172,28 +171,27 @@ int BulkLoad(char* fileName, int N, int d, int maxCap){
         
         phIn = fhIn.PageAt(pageNum);
         dataIn = phIn.GetData();
-        char* pointStart = dataIn+offset;
+        int* pointStart = (int *)(dataIn+offset);
 
         Node* newNode = new Node(d,maxCap);
         newNode->ID = i;
         
         // Store residual Value in first d integers
         for(int j =0; j<d; j++){
-            memcpy(newNode->mbr+j*INT_SIZE,&resVal,INT_SIZE);
+            memcpy(newNode->mbr+j,&resVal,INT_SIZE);
         }
         //store d points from the file into mbr
-        memcpy(newNode->mbr+d*INT_SIZE,pointStart,d*INT_SIZE);
+        memcpy(newNode->mbr+d,pointStart,d*INT_SIZE);
         //cout << *(int *)pointStart << endl;
         //set all the child ID's to -1
         for(int j=0; j<maxCap; j++){
-           *(int *)(newNode->childID+j*INT_SIZE) = -1;
+           *(newNode->childID+j) = -1;
         }
 
         //store residual Value in the child Data
         for(int j=0; j<2*d*maxCap; j++){
-            memcpy(newNode->childData+j*INT_SIZE,&resVal,INT_SIZE);
+            memcpy(newNode->childData+j,&resVal,INT_SIZE);
         }
-        
         //Store the every Node into the New Page
         phOut = fhOut.NewPage();
         dataOut = phOut.GetData();
@@ -207,11 +205,10 @@ int BulkLoad(char* fileName, int N, int d, int maxCap){
     fhOut.FlushPages();
     fm.CloseFile(fhOut);
     fm.CloseFile(fhIn);  
-
-    return AssignParent(fileName, 0, N, d, maxCap);  
+    return AssignParent(0, N, d, maxCap);  
 }
 
-int AssignParent(string fileName, int start, int end, int d, int maxCap){
+int AssignParent(int start, int end, int d, int maxCap){
     int resVal = INT_MIN;
     FileHandler fhIn, fhOut;
     PageHandler phIn, phOut;
@@ -254,29 +251,29 @@ int AssignParent(string fileName, int start, int end, int d, int maxCap){
             fhIn.UnpinPage(childID);
 
             for(int k=0; k<d ;k++){
-                minPoint[k]=min(minPoint[k],*(int *)(childNode->mbr+(k+o)*INT_SIZE));
-                maxPoint[k]=max(maxPoint[k],*(int *)(childNode->mbr+(k+d)*INT_SIZE));
+                minPoint[k]=min(minPoint[k],*(childNode->mbr+(k+o)));
+                maxPoint[k]=max(maxPoint[k],*(childNode->mbr+(k+d)));
             }
             
             //Copy Child Data
-            *(int *)(parentNode->childID+j*INT_SIZE)=childNode->ID;
-            memcpy(parentNode->childData+2*d*j*INT_SIZE,childNode->mbr,2*d*INT_SIZE); 
+            *(int *)(parentNode->childID+j)=childNode->ID;
+            memcpy(parentNode->childData+2*d*j,childNode->mbr,2*d*INT_SIZE); 
             
         }
         
         //set all the child ID's to -1 for the remainign childs
         for(int j=lastNodeChilds; j<maxCap; j++){
-           *(int *)(parentNode->childID+j*INT_SIZE) = -1;
+           *(parentNode->childID+j) = -1;
         }
 
         //store residual Value in the child Data for the remaining childs
         for(int j=2*d*lastNodeChilds; j<2*d*maxCap; j++){
-            memcpy(parentNode->childData+j*INT_SIZE,&resVal,INT_SIZE);
+            memcpy(parentNode->childData+j,&resVal,INT_SIZE);
         }
         
         //Store the Parent's mbr
         memcpy(parentNode->mbr,minPoint,d*INT_SIZE);
-        memcpy(parentNode->mbr+d*INT_SIZE,maxPoint,d*INT_SIZE);
+        memcpy(parentNode->mbr+d,maxPoint,d*INT_SIZE);
 
         //Store the Parent's Data
         phOut = fhOut.NewPage();
@@ -288,11 +285,11 @@ int AssignParent(string fileName, int start, int end, int d, int maxCap){
  
     } 
     fhOut.FlushPages();
-    return AssignParent(fileName, end, end+numParents, d, maxCap);
+    return AssignParent(end, end+numParents, d, maxCap);
 
 }
 
-bool isPresent(char *point, int nodeID, int d, int maxCap){
+bool isPresent(int *point, int nodeID, int d, int maxCap){
     FileHandler fh = fm.OpenFile("treeData.txt");
     PageHandler ph = fh.PageAt(nodeID);
     char* data = ph.GetData();
@@ -301,7 +298,7 @@ bool isPresent(char *point, int nodeID, int d, int maxCap){
     fh.UnpinPage(nodeID);
     // If the Node is LeafNode
     if (nodeData->isLeaf(maxCap)){
-        char *pointData = (nodeData->mbr+d*INT_SIZE);
+        int *pointData = (nodeData->mbr+d);
         return isEqual(point, pointData, d);
     } 
     
@@ -313,7 +310,7 @@ bool isPresent(char *point, int nodeID, int d, int maxCap){
             if (childID <0)
                 ans = ans|false;
             else{
-                char *childMBR = nodeData->getChildData(i, d);
+                int *childMBR = nodeData->getChildData(i, d);
                 if (!isInside(point, childMBR, d)){
                     ans = ans|false;
                 }
